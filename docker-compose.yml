@@ -1,0 +1,67 @@
+version: "3.8"
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "4000:4000"
+    restart: always
+    depends_on:
+      - kafka
+
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8080:8080"
+    restart: always
+    depends_on:
+      - auth-service
+      - microservice-company
+      - microservice-client
+
+  microservice-company:
+    build: ./microservice-company
+    ports:
+      - "6000:6000"
+    restart: always
+    depends_on:
+      - kafka
+
+  microservice-client:
+    build: ./microservice-client
+    ports:
+      - "5000:5000"
+    restart: always
+    depends_on:
+      - kafka
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - microservice-client

@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package client;
+
+service ClientService {
+  rpc GetClientInfo (ClientRequest) returns (ClientResponse);
+}
+
+message ClientRequest {
+  string name = 1;
+}
+
+message ClientResponse {
+  string name = 1;
+  string company = 2;
+  string position = 3;
+}
