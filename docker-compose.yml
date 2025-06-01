@@ -1,67 +1,82 @@
+# ✅ Specifică versiunea fișierului Docker Compose (funcționalitățile diferă între versiuni)
 version: "3.8"
 
 services:
+  # === ZOOKEEPER ===
+  # Zookeeper este necesar pentru Kafka — ajută la gestionarea nodurilor Kafka (coordonator)
   zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    container_name: zookeeper
+    image: confluentinc/cp-zookeeper:latest  # Imagine oficială Zookeeper de la Confluent
+    container_name: zookeeper                # Numele containerului
     ports:
-      - "2181:2181"
+      - "2181:2181"                          # Expune portul standard Zookeeper
     environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_CLIENT_PORT: 2181           # Port pe care clienții se conectează
+      ZOOKEEPER_TICK_TIME: 2000             # Interval de sincronizare între noduri (în ms)
 
+  # === KAFKA ===
+  # Kafka este folosit pentru mesagerie între microservicii (event-driven)
   kafka:
-    image: confluentinc/cp-kafka:latest
-    container_name: kafka
+    image: confluentinc/cp-kafka:latest      # Imagine Kafka de la Confluent
+    container_name: kafka                    # Numele containerului Kafka
     ports:
-      - "9092:9092"
+      - "9092:9092"                          # Portul Kafka expus în exterior
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_BROKER_ID: 1                     # ID unic pentru acest broker Kafka
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181  # Kafka se conectează la Zookeeper
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092  # Adresă la care Kafka se expune către alte containere
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092           # Adresă pe care Kafka ascultă conexiuni
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1           # Număr de replici pentru topicurile de offset
     depends_on:
-      - zookeeper
+      - zookeeper                          # Asigură că Zookeeper e pornit înaintea Kafka
 
+  # === AUTH SERVICE ===
+  # Microserviciu care gestionează autentificarea și generează token-uri JWT
   auth-service:
-    build: ./auth-service
+    build: ./auth-service                 # Construiește imaginea din folderul ./auth-service
     ports:
-      - "4000:4000"
-    restart: always
+      - "4000:4000"                       # Expune serviciul pe portul 4000
+    restart: always                       # Repornire automată dacă serviciul cade
     depends_on:
-      - kafka
+      - kafka                             # Așteaptă Kafka înainte de a porni
 
+  # === API GATEWAY ===
+  # Punctul central prin care frontend-ul accesează toate microserviciile (REST + proxy)
   api-gateway:
-    build: ./api-gateway
+    build: ./api-gateway                  # Construiește imaginea din folderul ./api-gateway
     ports:
-      - "8080:8080"
+      - "8080:8080"                       # Expune API Gateway pe portul 8080
     restart: always
     depends_on:
-      - auth-service
-      - microservice-company
-      - microservice-client
+      - auth-service                      # Gateway-ul așteaptă ca auth să fie gata
+      - microservice-company              # Așteaptă compania
+      - microservice-client               # Așteaptă clientul
 
+  # === MICROSERVICE COMPANY ===
+  # Microserviciul care gestionează datele despre companii și comunică cu clientul (REST, Kafka, gRPC)
   microservice-company:
     build: ./microservice-company
     ports:
-      - "6000:6000"
+      - "6000:6000"                       # Expune serviciul companiei pe portul 6000
     restart: always
     depends_on:
       - kafka
 
+  # === MICROSERVICE CLIENT ===
+  # Microserviciul care gestionează datele despre clienți și comunică cu compania
   microservice-client:
     build: ./microservice-client
     ports:
-      - "5000:5000"
+      - "5000:5000"                       # Port pentru client service
     restart: always
     depends_on:
       - kafka
 
+  # === FRONTEND ===
+  # Interfața grafică (UI) a aplicației, construită cu Svelte/Vite
   frontend:
     build:
-      context: ./frontend
+      context: ./frontend                 # Contextul de build este folderul frontend
     ports:
-      - "5173:80"
+      - "5173:80"                         # Portul 5173 în host → portul 80 în container (serviciul rulează în Nginx)
     depends_on:
-      - microservice-client
+      - microservice-client              # Se asigură că backend-ul client este disponibil
